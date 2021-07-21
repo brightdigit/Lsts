@@ -6,12 +6,8 @@
 //
 
 import SwiftUI
+import LstsUIKit
 
 @main
-struct LstsApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
-    }
+struct App: LstsApp {
 }
