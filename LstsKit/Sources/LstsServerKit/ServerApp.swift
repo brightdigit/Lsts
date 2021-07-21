@@ -51,8 +51,6 @@ public struct ServerApp {
     ])
     try app.autoMigrate().wait()
     
-    self.app.get("") { request in
-      return "Hello World!"
-    }
+    try self.app.register(collection: LstsItemController())
   }
 }
