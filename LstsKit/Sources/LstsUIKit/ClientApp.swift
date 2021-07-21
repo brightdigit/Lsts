@@ -9,12 +9,12 @@ import SwiftUI
 
 
 @available(iOS 14.0, *)
-public protocol LstsApp: App {
+public protocol ClientApp: App {
 
 }
 
 @available(iOS 14.0, *)
-public extension LstsApp {
+public extension ClientApp {
   var body: some Scene {
       WindowGroup {
         ContentView().environmentObject(LstsObject())

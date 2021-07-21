@@ -9,5 +9,5 @@ import SwiftUI
 import LstsUIKit
 
 @main
-struct App: LstsApp {
+struct App: ClientApp {
 }
