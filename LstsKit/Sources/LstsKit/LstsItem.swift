@@ -1,5 +1,11 @@
 import Foundation
 
+public enum LstsError : Error {
+  case empty
+  case notImplemented
+}
+
+
 public struct LstsItem : Codable {
   public init(id: UUID? = nil, title: String, completedAt: Date? = nil) {
     self.id = id ?? UUID()

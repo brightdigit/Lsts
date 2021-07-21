@@ -11,10 +11,6 @@ import LstsKit
 extension LstsItem : Content {}
 extension LstsItemRequest : Content {}
 
-enum LstsError : Error {
-  case notImplemented
-}
-
 public struct LstsItemController {
   public func get (_ request: Request) -> EventLoopFuture<LstsItem> {
     return request.eventLoop.future(error: LstsError.notImplemented)
