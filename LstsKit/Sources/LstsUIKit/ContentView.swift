@@ -59,24 +59,6 @@ extension JSONDecoder {
     case (.none, .some(_), _, .none):
       return .failure(otherwise())
     }
-  
-//    switch () {
-//
-//    }
-//    if let error = error {
-//      return .failure(error)
-//    } else if let response = response {
-//      if let httpURLResponse = response as? HTTPURLResponse, let data = data {
-//        self.decode(HTTPError.Response.self, from: data)
-//      }
-//    } else if let data = data {
-//      return Result { try self.decode(type, from: data)}
-//    } else if let response = response {
-//      if let withResponse = withResponse {
-//        return withResponse(response)
-//      } else
-//    }
-//      return .failure(otherwise())
     
   }
   
@@ -108,12 +90,13 @@ extension LstsItem : Identifiable {
 }
 
 public struct LstsService {
+  let baseURL = URL(string: "http://localhost:8080")!
   let session = URLSession.shared
   let decoder = JSONDecoder()
   let encoder = JSONEncoder()
   
   func list (_ completion: @escaping ((Result<[LstsItem], Error>) -> Void)) {
-    let url = URL(string: "https://cdae8fbf15cd.ngrok.io/items")!
+    let url = baseURL.appendingPathComponent("items")
     session.dataTask(
       with: url,
       completionHandler: decoder.decoder(for: [LstsItem].self, completionHandler: completion)
@@ -121,9 +104,10 @@ public struct LstsService {
   }
   
   func create (_ item: LstsItemRequest, _ completion: @escaping ((Result<LstsItem, Error>) -> Void)) {
-    let url = URL(string: "https://cdae8fbf15cd.ngrok.io/items")!
+    let url = baseURL.appendingPathComponent("items")
     var urlRequest = URLRequest(url: url)
     urlRequest.httpMethod = "POST"
+    urlRequest.addValue("application/json", forHTTPHeaderField: "Content-Type")
     let data : Data
     do {
       data = try encoder.encode(item)
@@ -138,6 +122,7 @@ public struct LstsService {
 public class LstsObject : ObservableObject {
   @Published var itemsToRemove = [LstsItem]()
   @Published var newTitle = ""
+  @Published var isCompleted : Bool = false
   
   @Published var error: Error?
   @Published var items : [LstsItem]?
@@ -163,6 +148,9 @@ public class LstsObject : ObservableObject {
       self.error = result.error
       self.refresh()
     }
+    DispatchQueue.main.async {
+      self.newTitle = ""
+    }
   }
   
   public func refresh () {
@@ -180,14 +168,51 @@ public class LstsObject : ObservableObject {
   
 }
 
+public struct ModalView : View {
+  internal init(title: Binding<String>, isCompleted : Binding<Bool>, isEditing: Binding<Bool>, onSave: @escaping () -> Void) {
+    self._title = title
+    self._isCompleted = isCompleted
+    self._isEditing = isEditing
+    self.onSave = onSave
+  }
+  
+  @Binding var title : String
+  @Binding var isCompleted : Bool
+  @Binding var isEditing : Bool
+  
+  var onSave : () -> Void
+  public var body : some View {
+    NavigationView{
+    Form{
+      Section{
+        TextField("Title", text: self.$title)
+        Toggle("Is Completed", isOn: self.$isCompleted)
+      }
+      
+    }.navigationTitle("New Item").navigationBarTitleDisplayMode(.inline)
+    .navigationBarItems(leading:Button("Cancel") {
+      self.isEditing = false
+    } , trailing: Button("Save") {
+      self.onSave()
+      self.isEditing = false
+    })
+    }
+    
+  }
+}
+
 @available(iOS 14.0, *)
 public struct ContentView: View {
   @EnvironmentObject var object : LstsObject
-  @State var isEditing = false
+  @State var isEditing : Bool
   
-  public init () {}
+  public init (isEditing: Bool = false) {
+    self.isEditing = isEditing
+  }
   public var body: some View {
+
     NavigationView{
+      
       Group {
         if let error = self.object.error {
           Text(error.localizedDescription)
@@ -201,18 +226,19 @@ public struct ContentView: View {
           ActivityIndicator()
         }
       }
-      .onAppear(perform: {
-        self.object.refresh()
-      })
-      .sheet(isPresented: self.$isEditing, onDismiss: {
-        self.object.beginCreate()
-      }, content: {
-        TextField("Title", text: self.$object.newTitle)
-      })
+        
+      
       .navigationTitle("Lsts").navigationBarItems(trailing: Button("Add", action: {
         self.isEditing = true
       }))
-    }
+    }.sheet(isPresented: self.$isEditing, content: { ModalView(title: self.$object.newTitle, isCompleted: self.$object.isCompleted, isEditing: self.$isEditing, onSave: self.object.beginCreate)
+    }).onAppear(perform:
+      self.object.refresh
+    )
+   
+      
+
+    
   }
   
   func onDelete(at indexSet: IndexSet) {
@@ -223,6 +249,14 @@ public struct ContentView: View {
 @available(iOS 14.0, *)
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
+      ContentView(isEditing: true).environmentObject(LstsObject(items: [
+                                                  LstsItem(title: "Item #1"),
+        LstsItem(title: "Item #2"),
+        LstsItem(title: "Item #3"),
+        LstsItem(title: "Item #4"),
+        LstsItem(title: "Item #5"),
+        LstsItem(title: "Item #6")
+      ]))
       ContentView().environmentObject(LstsObject(items: [
                                                   LstsItem(title: "Item #1"),
         LstsItem(title: "Item #2"),

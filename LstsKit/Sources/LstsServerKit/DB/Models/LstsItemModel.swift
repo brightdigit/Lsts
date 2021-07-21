@@ -8,6 +8,7 @@
 
 import Fluent
 import Vapor
+import LstsKit
 
 final class LstsItemModel : Model {
   static let schema = "Items"
@@ -20,4 +21,20 @@ final class LstsItemModel : Model {
   
   @Field(key: "completedAt")
   public var completedAt: Date?
+  
+  init() {
+    
+  }
+  init(id: UUID? = nil, title: String, completedAt: Date? = nil) {
+    self.id = id
+    self.title = title
+    self.completedAt = completedAt
+  }
+}
+
+
+extension LstsItemModel {
+  convenience init(request: LstsItemRequest) {
+    self.init(title: request.title, completedAt: request.completedAt)
+  }
 }

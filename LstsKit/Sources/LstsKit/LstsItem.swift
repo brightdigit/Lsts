@@ -25,6 +25,7 @@ public enum LstsError : Error {
 
 
 public struct LstsItem : Codable {
+  
   public init(id: UUID? = nil, title: String, completedAt: Date? = nil) {
     self.id = id ?? UUID()
     self.title = title
