@@ -1,8 +1,26 @@
 import Foundation
 
+public struct HTTPError : Error, LocalizedError {
+  public init(statusCode: Int, response: HTTPError.Response) {
+    self.statusCode = statusCode
+    self.response = response
+  }
+  
+  let statusCode : Int
+  let response : Response
+  
+  public struct Response : Codable {
+    let reason: String
+  }
+  
+  public var errorDescription: String? {
+    return "HTTP Error: \(self.statusCode)\n\(self.response.reason)"
+  }
+}
+
 public enum LstsError : Error {
   case empty
-  case notImplemented
+  
 }
 
 
