@@ -118,19 +118,103 @@ public struct LstsService {
     urlRequest.httpBody = data
     session.dataTask(with: urlRequest, completionHandler: decoder.decoder(for: LstsItem.self, completionHandler: completion)).resume()
   }
+  
+  func removeItem(withID itemID: UUID, _ completion: @escaping ((Error?) -> Void)) {
+    let url = baseURL.appendingPathComponent("items").appendingPathComponent(itemID.uuidString)
+    var urlRequest = URLRequest(url: url)
+    
+    urlRequest.httpMethod = "DELETE"
+    
+    session.dataTask(with: urlRequest) { data, response, error in
+      let resultError : Error?
+      if let error = error {
+        resultError = error
+      } else if let response = response as? HTTPURLResponse {
+        if response.statusCode / 100 == 2 {
+          resultError = nil
+        } else {
+          let errorResponse : HTTPError.Response?
+          if let data = data {
+            errorResponse = try? self.decoder.decode(HTTPError.Response.self, from: data)
+          } else {
+            errorResponse = nil
+          }
+          let error : Error
+          if let errorResponse = errorResponse {
+            error = HTTPError(statusCode: response.statusCode, response: errorResponse)
+          } else {
+            error = LstsError.empty
+          }
+          resultError = error
+        }
+      } else {
+        resultError = LstsError.empty
+      }
+      completion(resultError)
+    }.resume()
+    
+  }
 }
 public class LstsObject : ObservableObject {
   @Published var itemsToRemove = [LstsItem]()
+  @Published var itemToUpdate : LstsItem?
+  
   @Published var newTitle = ""
   @Published var isCompleted : Bool = false
   
   @Published var error: Error?
   @Published var items : [LstsItem]?
   
+  var refreshTrigger = PassthroughSubject<Void, Never>()
+  var deleteTrigger = PassthroughSubject<Void, Never>()
+  var cancellables = [AnyCancellable]()
+  
   let service = LstsService()
   
   public init () {
+    refreshTrigger.sink {
+      self.service.list { result in
+        DispatchQueue.main.async {
+          switch (result) {
+          case .failure(let error):
+            self.error = error
+          case .success(let items):
+            self.items = items
+          }
+        }
+      }
+    }.store(in: &self.cancellables)
     
+    
+    let deletingPublisher = self.deleteTrigger.combineLatest(self.$itemsToRemove).map{$0.1}.filter{$0.count > 0}.map { items in
+      //print(items)
+      return items.map{ item in
+        
+        Future<Error?, Never> { completed in
+          print(item.id)
+          self.service.removeItem(withID: item.id) { error in
+            completed(.success(error))
+          }
+        }
+      }
+    }.filter({ $0.count > 0 })
+    .flatMap { publishers in
+      Publishers.MergeMany(publishers).collect()
+    }.map{
+      $0.compactMap{$0}.first
+    }
+    
+    //deletingPublisher.share().map{_ in [LstsItem]()}.assign(to: &self.$itemsToRemove)
+    
+    deletingPublisher.receive(on: DispatchQueue.main).sink { error in
+      self.error = error
+      
+      self.itemsToRemove = []
+      
+      self.refreshTrigger.send()
+    }.store(in: &self.cancellables)
+    
+    //deletingPublisher.share().map({_ in }).multicast(subject: self.refreshTrigger).connect().store(in: &self.cancellables)
   }
   
   internal init(items: [LstsItem]?) {
@@ -140,12 +224,19 @@ public class LstsObject : ObservableObject {
   public func beginDelete (itemsAt indexSet: IndexSet) {
     if let items = self.items {
       itemsToRemove.append(contentsOf: indexSet.map{ items[$0] })
+      self.deleteTrigger.send()
     }
+  }
+  
+  public func beginUpdate (item: LstsItem) {
+    self.itemToUpdate = item
   }
   
   public func beginCreate () {
     self.service.create(LstsItemRequest(title: newTitle)) { result in
-      self.error = result.error
+      DispatchQueue.main.async {
+        self.error = result.error
+      }
       self.refresh()
     }
     DispatchQueue.main.async {
@@ -154,18 +245,54 @@ public class LstsObject : ObservableObject {
   }
   
   public func refresh () {
-    self.service.list { result in
-      DispatchQueue.main.async {
-        switch (result) {
-        case .failure(let error):
-          self.error = error
-        case .success(let items):
-          self.items = items
-        }
-      }
-    }
+    refreshTrigger.send()
+    
   }
   
+}
+
+public struct EditorView : View {
+  internal init(existingItem: LstsItem, onSave: @escaping (LstsItem) -> Void) {
+    self.id = existingItem.id
+    self.originalCompletedAt = existingItem.completedAt
+    self.onSave = onSave
+    self._title = .init(initialValue:  existingItem.title)
+    self._isCompleted = .init(initialValue: existingItem.completedAt != nil)
+    
+  }
+  
+  let id : UUID
+  let originalCompletedAt: Date?
+  @State var title : String
+  @State var isCompleted : Bool
+  
+  var onSave : (LstsItem) -> Void
+  
+  public var updatedCompletedAt: Date? {
+    switch (originalCompletedAt, isCompleted) {
+    case (.none, true):
+      return Date()
+    case (_, false):
+      return nil
+    case (.some(let date), true):
+      return date
+    }
+  }
+  public var body : some View {
+    NavigationView{
+    Form{
+      Section{
+        TextField("Title", text: self.$title)
+        Toggle("Is Completed", isOn: self.$isCompleted)
+      }
+      
+    }.navigationTitle("New Item").navigationBarTitleDisplayMode(.inline)
+    .navigationBarItems( trailing: Button("Save") {
+      self.onSave(LstsItem(id: id, title: title, completedAt: self.updatedCompletedAt))
+    })
+    }
+    
+  }
 }
 
 public struct ModalView : View {
@@ -191,10 +318,16 @@ public struct ModalView : View {
       
     }.navigationTitle("New Item").navigationBarTitleDisplayMode(.inline)
     .navigationBarItems(leading:Button("Cancel") {
-      self.isEditing = false
+      DispatchQueue.main.async {
+        self.isEditing = false
+        
+      }
     } , trailing: Button("Save") {
       self.onSave()
-      self.isEditing = false
+      DispatchQueue.main.async {
+        self.isEditing = false
+        
+      }
     })
     }
     
@@ -204,10 +337,12 @@ public struct ModalView : View {
 @available(iOS 14.0, *)
 public struct ContentView: View {
   @EnvironmentObject var object : LstsObject
+  @State var isCreating : Bool
   @State var isEditing : Bool
   
-  public init (isEditing: Bool = false) {
-    self.isEditing = isEditing
+  public init (isCreating: Bool = false) {
+    self.isCreating = isCreating
+    self.isEditing = false
   }
   public var body: some View {
 
@@ -219,7 +354,9 @@ public struct ContentView: View {
         } else if let items = self.object.items {
           List{
             ForEach(items) { item in
-            Text(item.title)
+              NavigationLink(item.title, destination: EditorView(existingItem: item, onSave: self.object.beginUpdate), isActive: self.$isEditing)
+              
+            
             }.onDelete(perform: self.onDelete(at:))
           }
         } else {
@@ -229,9 +366,12 @@ public struct ContentView: View {
         
       
       .navigationTitle("Lsts").navigationBarItems(trailing: Button("Add", action: {
-        self.isEditing = true
+        DispatchQueue.main.async {
+          self.isCreating = true
+          
+        }
       }))
-    }.sheet(isPresented: self.$isEditing, content: { ModalView(title: self.$object.newTitle, isCompleted: self.$object.isCompleted, isEditing: self.$isEditing, onSave: self.object.beginCreate)
+    }.sheet(isPresented: self.$isEditing, content: { ModalView(title: self.$object.newTitle, isCompleted: self.$object.isCompleted, isEditing: self.$isCreating, onSave: self.object.beginCreate)
     }).onAppear(perform:
       self.object.refresh
     )
@@ -249,7 +389,7 @@ public struct ContentView: View {
 @available(iOS 14.0, *)
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
-      ContentView(isEditing: true).environmentObject(LstsObject(items: [
+      ContentView(isCreating: true).environmentObject(LstsObject(items: [
                                                   LstsItem(title: "Item #1"),
         LstsItem(title: "Item #2"),
         LstsItem(title: "Item #3"),

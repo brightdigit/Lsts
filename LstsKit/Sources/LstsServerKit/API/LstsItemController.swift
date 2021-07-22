@@ -45,7 +45,17 @@ public struct LstsItemController {
   }
   
   public func delete (_ request: Request) -> EventLoopFuture<HTTPResponseStatus> {
-    return request.eventLoop.future(error: Abort(.notImplemented))
+    let id : UUID
+    do {
+     id = try request.parameters.require("id", as: UUID.self)
+    } catch {
+      return request.eventLoop.future(error: Abort.init(.badRequest))
+    }
+    return LstsItemModel
+      .find(id, on: request.db)
+      .unwrap(orError: Abort(.notFound))
+      .flatMap{ $0.delete(on: request.db) }
+      .transform(to: HTTPResponseStatus.noContent)
   }
 }
 
