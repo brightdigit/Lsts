@@ -17,7 +17,7 @@ public protocol ClientApp: App {
 public extension ClientApp {
   var body: some Scene {
       WindowGroup {
-        ContentView().environmentObject(LstsObject())
+        HelloView().environmentObject(HelloObject())
       }
   }
 }
