@@ -8,7 +8,6 @@ public struct ServerApp {
   
   let env : Environment
   let app : Application
-  
 
   public static func run () throws {
     var env = try Environment.detect()
@@ -23,10 +22,7 @@ public struct ServerApp {
     try app.run()
   }
   
- 
   public func configure() throws {
-
-    
     try self.app.register(collection: HelloWorldController())
   }
 }
