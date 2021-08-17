@@ -20,6 +20,8 @@ let package = Package(
     ],
     dependencies: [
       .package(url: "https://github.com/vapor/vapor.git", from: "4.0.0"),
+      .package(url: "https://github.com/vapor/fluent.git", from: "4.0.0"),
+      .package(url: "https://github.com/vapor/fluent-postgres-driver.git", from: "2.0.0")
     ],
     targets: [
         .target(
@@ -31,7 +33,9 @@ let package = Package(
       .target(
           name: "LstsServerKit",
           dependencies: ["LstsKit",
-                         .product(name: "Vapor", package: "vapor")]),
+                         .product(name: "Vapor", package: "vapor"),
+                         .product(name: "Fluent", package: "fluent"),
+                           .product(name: "FluentPostgresDriver", package: "fluent-postgres-driver")]),
         .target(name: "lstsd", dependencies: ["LstsServerKit"]),
         .testTarget(
             name: "LstsKitTests",
