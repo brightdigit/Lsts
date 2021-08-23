@@ -10,7 +10,6 @@ public struct ServerApp {
   
   let env : Environment
   let app : Application
-  
 
   public static func run () throws {
     var env = try Environment.detect()
@@ -24,7 +23,7 @@ public struct ServerApp {
     try self.configure()
     try app.run()
   }
-  
+
   static let defaultPostgreSQLConfig = PostgresConfiguration(hostname: "localhost", username: "lsts")
   
   static func postgreSQLConfig(from environment: Environment.Type) -> PostgresConfiguration {
@@ -50,8 +49,7 @@ public struct ServerApp {
     ])
     try app.autoMigrate().wait()
     
-    try self.app.register(collection: LstsItemController())
-    
     try self.app.register(collection: HelloWorldController())
+    try self.app.register(collection: LstsItemController())    
   }
 }

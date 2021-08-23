@@ -335,7 +335,7 @@ public struct ModalView : View {
 }
 
 @available(iOS 14.0, *)
-public struct ContentView: View {
+public struct LstsView: View {
   @EnvironmentObject var object : LstsObject
   @State var isCreating : Bool
   @State var isEditing : Bool
@@ -389,7 +389,7 @@ public struct ContentView: View {
 @available(iOS 14.0, *)
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
-      ContentView(isCreating: true).environmentObject(LstsObject(items: [
+      LstsView(isCreating: true).environmentObject(LstsObject(items: [
                                                   LstsItem(title: "Item #1"),
         LstsItem(title: "Item #2"),
         LstsItem(title: "Item #3"),
@@ -397,7 +397,7 @@ struct ContentView_Previews: PreviewProvider {
         LstsItem(title: "Item #5"),
         LstsItem(title: "Item #6")
       ]))
-      ContentView().environmentObject(LstsObject(items: [
+      LstsView().environmentObject(LstsObject(items: [
                                                   LstsItem(title: "Item #1"),
         LstsItem(title: "Item #2"),
         LstsItem(title: "Item #3"),
@@ -405,6 +405,6 @@ struct ContentView_Previews: PreviewProvider {
         LstsItem(title: "Item #5"),
         LstsItem(title: "Item #6")
       ]))
-      ContentView().environmentObject(LstsObject(items: nil))
+      LstsView().environmentObject(LstsObject(items: nil))
     }
 }

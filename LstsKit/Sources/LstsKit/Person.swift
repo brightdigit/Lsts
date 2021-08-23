@@ -8,5 +8,9 @@
 import Foundation
 
 public struct Person : Codable {
-  public let name : String
+  public init(name: String = "") {
+    self.name = name
+  }
+  
+  public var name : String
 }
